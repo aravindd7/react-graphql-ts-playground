@@ -3,7 +3,7 @@ import { MikroORM } from "@mikro-orm/core";
 import mikroConfig from "./mikro-orm.config";
 
 // Entities
-import { Post } from "./entities/Post";
+// import { Post } from "./entities/Post";
 
 const main = async () => {
   const orm = await MikroORM.init(mikroConfig);
@@ -14,8 +14,8 @@ const main = async () => {
   // await orm.em.persistAndFlush(post);
 
   // Find all the debug posts in db
-  const posts = await orm.em.find(Post, {});
-  console.log(posts);
+  // const posts = await orm.em.find(Post, {});
+  // console.log(posts);
 };
 
 main().catch((error) => {
