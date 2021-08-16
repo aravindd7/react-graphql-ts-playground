@@ -1,8 +1,8 @@
 {
   "ts-node": {
-    "transpileOnly": true,
+    "transpileOnly": false,
     "require": [
-      "typescript-transform-paths/register"
+      "tsconfig-paths/register"
     ]
   },
   "compilerOptions": {
