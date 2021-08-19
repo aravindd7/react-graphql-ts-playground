@@ -1,14 +1,25 @@
 import "reflect-metadata";
 import { MikroORM } from "@mikro-orm/core";
 import mikroConfig from "./mikro-orm.config";
+import { environment as env } from "../environment";
+import { MyContext } from "./types";
+import { __prod__ } from "./constants";
 
 import express from "express";
 import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
-import { PostResolver } from "./resolvers/post";
+// Importing to use GraphQL Playground instead of Apollo Sandbox. Sandbox
+// needs a lot of work to be able to set cookies while sending queries.
+import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core/dist/plugin/landingPage/graphqlPlayground";
 
-// Entities
-// import { Post } from "./entities/Post";
+// Redis & sessions
+import redis from "redis";
+import session from "express-session";
+import connectRedis from "connect-redis";
+
+// Resolvers
+import { PostResolver } from "./resolvers/post";
+import { UserResolver } from "./resolvers/user";
 
 const main = async () => {
   const orm = await MikroORM.init(mikroConfig);
@@ -16,12 +27,39 @@ const main = async () => {
 
   const app = express();
 
+  const RedisStore: connectRedis.RedisStore = connectRedis(session);
+  const redisClient: redis.RedisClient = redis.createClient();
+
+  app.use(
+    session({
+      name: "qid",
+      store: new RedisStore({
+        client: redisClient,
+        disableTouch: true,
+      }),
+      cookie: {
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+        sameSite: "lax", // Protects against CSRF
+        httpOnly: true,
+        // Secure makes it so the cookie will only work via https. Setting
+        // to __prod__ so that the cookie will only be secure in a production
+        // environment (when __prod__ evaluates to true). Else (in dev) this
+        // is something I don't have to worry about.
+        secure: __prod__,
+      },
+      saveUninitialized: false,
+      secret: env.REDIS_SECRET,
+      resave: false,
+    })
+  );
+
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
-      resolvers: [PostResolver],
+      resolvers: [UserResolver, PostResolver],
       validate: false,
     }),
-    context: () => ({ em: orm.em }),
+    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
+    plugins: [ApolloServerPluginLandingPageGraphQLPlayground],
   });
 
   await apolloServer.start();

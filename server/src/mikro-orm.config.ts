@@ -1,8 +1,13 @@
 import { MikroORM } from "@mikro-orm/core";
+
+// Config
 import { environment as env } from "../environment";
 import { __prod__ } from "./constants";
-import { Post } from "./entities/Post";
 import path from "path";
+
+// Entities
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
 
 export default {
   migrations: {
@@ -15,7 +20,7 @@ export default {
     // https://github.com/mikro-orm/mikro-orm/issues/190
     disableForeignKeys: false,
   },
-  entities: [Post],
+  entities: [Post, User],
   host: env.DB_HOST,
   port: env.DB_PORT,
   dbName: env.DB_NAME,
