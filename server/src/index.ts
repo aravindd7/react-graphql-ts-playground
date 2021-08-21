@@ -6,6 +6,7 @@ import { MyContext } from "./types";
 import { __prod__ } from "./constants";
 
 import express from "express";
+import cors from "cors";
 import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
 // Importing to use GraphQL Playground instead of Apollo Sandbox. Sandbox
@@ -29,6 +30,13 @@ const main = async () => {
 
   const RedisStore: connectRedis.RedisStore = connectRedis(session);
   const redisClient: redis.RedisClient = redis.createClient();
+
+  app.use(
+    cors({
+      origin: "http://localhost:3000",
+      credentials: true,
+    })
+  );
 
   app.use(
     session({
@@ -64,7 +72,7 @@ const main = async () => {
 
   await apolloServer.start();
 
-  apolloServer.applyMiddleware({ app });
+  apolloServer.applyMiddleware({ app, cors: false, });
 
   app.listen(4000, () => {
     console.log("server started on localhost:4000");
