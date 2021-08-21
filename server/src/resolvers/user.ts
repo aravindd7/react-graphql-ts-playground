@@ -10,6 +10,7 @@ import {
   Resolver,
 } from "type-graphql";
 import argon2 from "argon2";
+import { EntityManager } from "@mikro-orm/postgresql";
 import { MyContext } from "../types";
 
 import { User } from "../entities/User";
@@ -61,7 +62,7 @@ export class UserResolver {
     const user = await em.findOneOrFail(User, { id: req.session.userId });
     return user;
   }
-  
+
   /**
    * Registers a user e.g. saves a new user to the db.
    * @param options { username: string, password: string }
@@ -93,25 +94,33 @@ export class UserResolver {
     }
 
     const hashedPassword = await argon2.hash(options.password);
-
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword,
-    });
+    let user;
 
     try {
-      await em.persistAndFlush(user);
-    } catch(error) {
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
+      user = result[0];
+    } catch (error) {
       // duplicate error
-      if (error.code === '23505') {
+      if (error.code === "23505") {
         return {
-          errors: [{ field: "username", message: "the username is already taken" }]
-        }
+          errors: [
+            { field: "username", message: "the username is already taken" },
+          ],
+        };
       }
     }
 
     req.session.userId = user.id;
-  
+
     return { user: user };
   }
 
@@ -146,7 +155,6 @@ export class UserResolver {
     return { user: user };
   }
 
-  
   /**
    * Returns all the users in the db.
    * @returns Promise<User[]>
