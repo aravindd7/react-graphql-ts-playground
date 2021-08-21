@@ -46,6 +46,23 @@ class UserResponse {
 @Resolver() // From GraphQL (type-graphql package)
 export class UserResolver {
   /**
+   * Returns the current user (logged in)
+   * @returns Promise<User | null>
+   */
+  @Query(() => User, { nullable: true })
+  async me(
+    @Ctx()
+    { em, req }: MyContext
+  ): Promise<User | null> {
+    if (!req.session.userId) {
+      return null;
+    }
+
+    const user = await em.findOneOrFail(User, { id: req.session.userId });
+    return user;
+  }
+  
+  /**
    * Registers a user e.g. saves a new user to the db.
    * @param options { username: string, password: string }
    * @returns Promise<UserResponse>
@@ -55,7 +72,7 @@ export class UserResolver {
     @Arg("options")
     options: UsernamePasswordInput,
     @Ctx()
-    { em }: MyContext
+    { em, req }: MyContext
   ): Promise<UserResponse> {
     // Check if user has a valid username
     if (options.username.length <= 2) {
@@ -93,6 +110,8 @@ export class UserResolver {
       }
     }
 
+    req.session.userId = user.id;
+  
     return { user: user };
   }
 
