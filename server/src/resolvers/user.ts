@@ -14,6 +14,7 @@ import { EntityManager } from "@mikro-orm/postgresql";
 import { MyContext } from "../types";
 
 import { User } from "../entities/User";
+import { COOKIE_NAME } from "../constants";
 
 // This is another way to declare GraphQL types, instead of using multiple
 // @Arg() statements in our functions.
@@ -153,6 +154,26 @@ export class UserResolver {
     req.session.userId = user.id;
 
     return { user: user };
+  }
+
+  /**
+   * Logs out an already signed in user
+   * @returns Promise<Boolean>
+   */
+  @Mutation(() => Boolean)
+  async logout(@Ctx() { req, res }: MyContext): Promise<Boolean> {
+    return new Promise((resolve) =>
+      req.session.destroy((error) => {
+        if (error) {
+          // Debugging for now
+          console.log(error);
+          resolve(false);
+          return;
+        }
+        res.clearCookie(COOKIE_NAME);
+        resolve(true);
+      })
+    );
   }
 
   /**
