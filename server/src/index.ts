@@ -21,9 +21,23 @@ import connectRedis from "connect-redis";
 // Resolvers
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
+import { User } from "./entities/User";
+// import { sendEmail } from "./utils/sendEmail";
 
 const main = async () => {
+  // Run this once when the server starts to get the details of ethereal email
+  // in the console. Make sure to uncomment console.log(testAccount) in
+  // sendEmail.ts.
+  // sendEmail(
+  //   "myles@myles.com",
+  //   "SUBJECT",
+  //   undefined,
+  //   "<h1>Welcome to the WORLD OF TOMORROW!</h1>"
+  // );
   const orm = await MikroORM.init(mikroConfig);
+
+  await orm.em.nativeDelete(User, {});  
+
   await orm.getMigrator().up();
 
   const app = express();
@@ -72,7 +86,7 @@ const main = async () => {
 
   await apolloServer.start();
 
-  apolloServer.applyMiddleware({ app, cors: false, });
+  apolloServer.applyMiddleware({ app, cors: false });
 
   app.listen(4000, () => {
     console.log("server started on localhost:4000");

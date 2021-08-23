@@ -18,6 +18,11 @@ export class User {
   // @Field(() => String)  // Not showing in GraphQL
   @Property({ type: "text", nullable: false })
   password: string;
+  
+  // Email
+  @Field(() => String)
+  @Property({ type: "text", nullable: false, unique: true })
+  email!: string;
 
   // Created At
   @Field(() => String)

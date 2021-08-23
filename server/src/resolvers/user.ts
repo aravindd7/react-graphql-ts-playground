@@ -10,11 +10,12 @@ import {
   Resolver,
 } from "type-graphql";
 import argon2 from "argon2";
-import { EntityManager } from "@mikro-orm/postgresql";
-import { MyContext } from "../types";
+// import { EntityManager } from "@mikro-orm/postgresql";
 
 import { User } from "../entities/User";
+import { MyContext } from "../types";
 import { COOKIE_NAME } from "../constants";
+import { EntityManager } from "@mikro-orm/postgresql";
 
 // This is another way to declare GraphQL types, instead of using multiple
 // @Arg() statements in our functions.
@@ -95,20 +96,24 @@ export class UserResolver {
     }
 
     const hashedPassword = await argon2.hash(options.password);
+
     let user;
 
     try {
-      const result = await (em as EntityManager)
-        .createQueryBuilder(User)
-        .getKnexQuery()
-        .insert({
-          username: options.username,
-          password: hashedPassword,
-          created_at: new Date(),
-          updated_at: new Date(),
-        })
-        .returning("*");
-      user = result[0];
+
+      const qb = (em as EntityManager).createQueryBuilder(User);
+      const knex = qb.getKnexQuery();
+
+      knex.insert({
+        username: options.username,
+        password: hashedPassword,
+        created_at: new Date(),
+        updated_at: new Date(),
+        // email: "myles@gmail.com"
+      }).returning("*");
+
+      let res = await em.getConnection().execute(knex);
+      user = res[0];
     } catch (error) {
       // duplicate error
       if (error.code === "23505") {
@@ -175,6 +180,20 @@ export class UserResolver {
       })
     );
   }
+
+  /**
+   * Sends an email to the user to reset the password.
+   * @returns Promise<Boolean>
+   */
+  // @Mutation(() => Boolean)
+  // async forgotPassword(
+  //   @Arg("email") email: string,
+  //   @Ctx() { em }: MyContext
+  // ): Promise<Boolean> {
+  //   const user = await em.findOne(User, { });
+
+  //   return true;
+  // }
 
   /**
    * Returns all the users in the db.

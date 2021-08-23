@@ -3,12 +3,19 @@ import { Box } from "@chakra-ui/layout";
 import { Button, Flex, Link } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { useLogoutMutation, useMeQuery } from "../generated/graphql";
+import { isServer } from "../utils/isServer";
 
 interface NavBarProps {}
 
 export const NavBar: React.FC<NavBarProps> = ({}) => {
   const [{ fetching: logoutFetching }, logout] = useLogoutMutation();
-  const [{ data, fetching }] = useMeQuery();
+  const [{ data, fetching }] = useMeQuery({
+    // Pause the query if it will be run on the server. We can tell that the
+    // query will run on the server if the window variable is defined. 
+    // Check utils/isServer.ts for boolean logic.
+    pause: isServer(),
+  });
+
   let body = null;
 
   if (fetching) {
