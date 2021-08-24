@@ -1,6 +1,5 @@
 import "reflect-metadata";
-import { MikroORM } from "@mikro-orm/core";
-import mikroConfig from "./mikro-orm.config";
+import { createConnection } from "typeorm";
 import { environment as env } from "../environment";
 import { MyContext } from "./types";
 import { COOKIE_NAME, __prod__ } from "./constants";
@@ -14,14 +13,16 @@ import { buildSchema } from "type-graphql";
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core/dist/plugin/landingPage/graphqlPlayground";
 
 // Redis & sessions
-import redis from "redis";
+// import redis from "redis";
+import Redis from "ioredis";
 import session from "express-session";
 import connectRedis from "connect-redis";
 
 // Resolvers
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
-import { User } from "./entities/User";
+import { Post } from "@entities/Post";
+import { User } from "@entities/User";
 // import { sendEmail } from "./utils/sendEmail";
 
 const main = async () => {
@@ -34,17 +35,20 @@ const main = async () => {
   //   undefined,
   //   "<h1>Welcome to the WORLD OF TOMORROW!</h1>"
   // );
-  const orm = await MikroORM.init(mikroConfig);
-
-  await orm.em.nativeDelete(User, {});  
-
-  await orm.getMigrator().up();
+  const conn = await createConnection({
+    type: 'postgres',
+    database: 'lireddit',
+    username: env.DB_USER,
+    password: env.DB_PASS,
+    logging: true,
+    synchronize: true,
+    entities: [Post, User]
+  })
 
   const app = express();
 
   const RedisStore: connectRedis.RedisStore = connectRedis(session);
-  const redisClient: redis.RedisClient = redis.createClient();
-
+  const redis: Redis.Redis = new Redis({});
   app.use(
     cors({
       origin: "http://localhost:3000",
@@ -56,7 +60,7 @@ const main = async () => {
     session({
       name: COOKIE_NAME,
       store: new RedisStore({
-        client: redisClient,
+        client: redis,
         disableTouch: true,
       }),
       cookie: {
@@ -80,7 +84,7 @@ const main = async () => {
       resolvers: [UserResolver, PostResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res }),
+    context: ({ req, res }): MyContext => ({ req, res, redis }),
     plugins: [ApolloServerPluginLandingPageGraphQLPlayground],
   });
 

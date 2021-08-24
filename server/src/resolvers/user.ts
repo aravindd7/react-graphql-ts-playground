@@ -2,7 +2,6 @@ import {
   Arg,
   Ctx,
   Field,
-  InputType,
   Int,
   Mutation,
   ObjectType,
@@ -10,23 +9,15 @@ import {
   Resolver,
 } from "type-graphql";
 import argon2 from "argon2";
-// import { EntityManager } from "@mikro-orm/postgresql";
 
 import { User } from "../entities/User";
 import { MyContext } from "../types";
-import { COOKIE_NAME } from "../constants";
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
 import { EntityManager } from "@mikro-orm/postgresql";
-
-// This is another way to declare GraphQL types, instead of using multiple
-// @Arg() statements in our functions.
-@InputType()
-class UsernamePasswordInput {
-  @Field()
-  username: string;
-
-  @Field()
-  password: string;
-}
+import { UsernamePasswordInput } from "./UsernamePasswordInput";
+import { validateRegister } from "../utils/validateRegister";
+import { sendEmail } from "../utils/sendEmail";
+import { v4 } from "uuid";
 
 @ObjectType()
 class FieldError {
@@ -77,43 +68,28 @@ export class UserResolver {
     @Ctx()
     { em, req }: MyContext
   ): Promise<UserResponse> {
-    // Check if user has a valid username
-    if (options.username.length <= 2) {
-      return {
-        errors: [{ field: "username", message: "the username is invalid" }],
-      };
-    }
-
-    if (options.password.length <= 5) {
-      return {
-        errors: [
-          {
-            field: "password",
-            message: "password length must be greater than 4",
-          },
-        ],
-      };
-    }
+    const errors = validateRegister(options);
+    if (errors) return { errors };
 
     const hashedPassword = await argon2.hash(options.password);
 
     let user;
 
     try {
+      // Trying out old way cause I'm a moron.
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          email: options.email,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
 
-      const qb = (em as EntityManager).createQueryBuilder(User);
-      const knex = qb.getKnexQuery();
-
-      knex.insert({
-        username: options.username,
-        password: hashedPassword,
-        created_at: new Date(),
-        updated_at: new Date(),
-        // email: "myles@gmail.com"
-      }).returning("*");
-
-      let res = await em.getConnection().execute(knex);
-      user = res[0];
+      user = result[0];
     } catch (error) {
       // duplicate error
       if (error.code === "23505") {
@@ -137,19 +113,28 @@ export class UserResolver {
    */
   @Mutation(() => UserResponse)
   async login(
-    @Arg("options")
-    options: UsernamePasswordInput,
-    @Ctx()
-    { em, req }: MyContext
+    @Arg("usernameOrEmail") usernameOrEmail: string,
+    @Arg("password") password: string,
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(User, { username: options.username });
+    const user = await em.findOne(
+      User,
+      usernameOrEmail.includes("@")
+        ? { email: usernameOrEmail }
+        : { username: usernameOrEmail }
+    );
     if (!user) {
       return {
-        errors: [{ field: "username", message: "that username doesn't exist" }],
+        errors: [
+          {
+            field: "usernameOrEmail",
+            message: "that username or email doesn't exist",
+          },
+        ],
       };
     }
 
-    const validPassword = await argon2.verify(user.password, options.password);
+    const validPassword = await argon2.verify(user.password, password);
     if (!validPassword) {
       return {
         errors: [{ field: "password", message: "incorrect password" }],
@@ -185,15 +170,87 @@ export class UserResolver {
    * Sends an email to the user to reset the password.
    * @returns Promise<Boolean>
    */
-  // @Mutation(() => Boolean)
-  // async forgotPassword(
-  //   @Arg("email") email: string,
-  //   @Ctx() { em }: MyContext
-  // ): Promise<Boolean> {
-  //   const user = await em.findOne(User, { });
+  @Mutation(() => Boolean)
+  async forgotPassword(
+    @Arg("email") email: string,
+    @Ctx() { em, redis }: MyContext
+  ): Promise<Boolean> {
+    const user = await em.findOne(User, { email: email });
+    const token = v4();
 
-  //   return true;
-  // }
+    let htmlResponse = `
+      <h2>It looks like you've forgotten your password...</h2>
+      <br>
+      <a href="http://localhost:3000/change-password/${token}">Reset your password</a>
+    `;
+
+    if (!user) return true;
+    // The user is not in the db. Don't tell them.
+    else {
+      // User is in the db. Generate a token to send an email.
+      await redis.set(
+        FORGET_PASSWORD_PREFIX + token,
+        user.id,
+        "ex",
+        1000 * 60 * 60 * 24 * 3 // Good for 3 days.
+      );
+    }
+
+    sendEmail(user.email, "You forgot your password!", undefined, htmlResponse);
+
+    return true;
+  }
+  /**
+   * Changes the password of a user via token.
+   * @param param0
+   * @returns Promise<UserResponse>
+   */
+  @Mutation(() => UserResponse)
+  async changePassword(
+    @Arg("token") token: string,
+    @Arg("newPassword") newPassword: string,
+    @Ctx() { em, req, redis }: MyContext
+  ): Promise<UserResponse> {
+    // Probably should just extract this to make a password validator
+    // in a new file. later.
+    if (newPassword.length <= 2) {
+      return {
+        errors: [
+          {
+            field: "newPassword",
+            message: "length must be greater than 2",
+          },
+        ]
+      };
+    };
+   
+    const key = `${ FORGET_PASSWORD_PREFIX }${ token }`;
+    const userId = await redis.get(key);
+
+    if (!userId) {
+      return {
+        errors: [{ field: "token", message: "token expired" }]
+      }
+    }
+
+    const user = await em.findOne(User, { id: parseInt(userId) });
+
+    if (!user) {
+      return {
+        errors: [{ field: "token", message: "user no longer exists" }]
+      }
+    }
+
+    user.password = await argon2.hash(newPassword);
+    await em.persistAndFlush(user);
+
+    await redis.del(key);
+
+    // Log in user after resetting password.
+    req.session.userId = user.id;
+
+    return { user: user };
+  }
 
   /**
    * Returns all the users in the db.
