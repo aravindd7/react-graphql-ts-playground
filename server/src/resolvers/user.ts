@@ -8,16 +8,17 @@ import {
   Query,
   Resolver,
 } from "type-graphql";
+import { getConnection } from "typeorm";
 import argon2 from "argon2";
+import { v4 } from "uuid";
 
 import { User } from "../entities/User";
-import { MyContext } from "../types";
+
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
-import { EntityManager } from "@mikro-orm/postgresql";
-import { UsernamePasswordInput } from "./UsernamePasswordInput";
-import { validateRegister } from "../utils/validateRegister";
+import { MyContext } from "../types";
 import { sendEmail } from "../utils/sendEmail";
-import { v4 } from "uuid";
+import { validateRegister } from "../utils/validateRegister";
+import { UsernamePasswordInput } from "./UsernamePasswordInput";
 
 @ObjectType()
 class FieldError {
@@ -41,19 +42,18 @@ class UserResponse {
 export class UserResolver {
   /**
    * Returns the current user (logged in)
-   * @returns Promise<User | null>
+   * @returns Promise<User | undefined>
    */
   @Query(() => User, { nullable: true })
   async me(
     @Ctx()
-    { em, req }: MyContext
-  ): Promise<User | null> {
+    { req }: MyContext
+  ): Promise<User | undefined> {
     if (!req.session.userId) {
-      return null;
+      return undefined;
     }
 
-    const user = await em.findOneOrFail(User, { id: req.session.userId });
-    return user;
+    return await User.findOne(req.session.userId);
   }
 
   /**
@@ -66,7 +66,7 @@ export class UserResolver {
     @Arg("options")
     options: UsernamePasswordInput,
     @Ctx()
-    { em, req }: MyContext
+    { req }: MyContext
   ): Promise<UserResponse> {
     const errors = validateRegister(options);
     if (errors) return { errors };
@@ -76,20 +76,23 @@ export class UserResolver {
     let user;
 
     try {
-      // Trying out old way cause I'm a moron.
-      const result = await (em as EntityManager)
-        .createQueryBuilder(User)
-        .getKnexQuery()
-        .insert({
+
+      // This...
+      // User.create({}).save()
+      // ...is equivalent to this:
+      const result = await getConnection()
+        .createQueryBuilder()
+        .insert()
+        .into(User)
+        .values({
           username: options.username,
           email: options.email,
           password: hashedPassword,
-          created_at: new Date(),
-          updated_at: new Date(),
         })
-        .returning("*");
-
-      user = result[0];
+        .returning("*")
+        .execute();
+    
+      user = result.raw[0];  // This should be the user.
     } catch (error) {
       // duplicate error
       if (error.code === "23505") {
@@ -115,14 +118,14 @@ export class UserResolver {
   async login(
     @Arg("usernameOrEmail") usernameOrEmail: string,
     @Arg("password") password: string,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(
-      User,
+    const user = await User.findOne(
       usernameOrEmail.includes("@")
-        ? { email: usernameOrEmail }
-        : { username: usernameOrEmail }
+        ? { where: { email: usernameOrEmail } }
+        : { where: { username: usernameOrEmail } }
     );
+
     if (!user) {
       return {
         errors: [
@@ -173,9 +176,9 @@ export class UserResolver {
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg("email") email: string,
-    @Ctx() { em, redis }: MyContext
+    @Ctx() { redis }: MyContext
   ): Promise<Boolean> {
-    const user = await em.findOne(User, { email: email });
+    const user = await User.findOne({ where: { email: email } });
     const token = v4();
 
     let htmlResponse = `
@@ -209,7 +212,7 @@ export class UserResolver {
   async changePassword(
     @Arg("token") token: string,
     @Arg("newPassword") newPassword: string,
-    @Ctx() { em, req, redis }: MyContext
+    @Ctx() { req, redis }: MyContext
   ): Promise<UserResponse> {
     // Probably should just extract this to make a password validator
     // in a new file. later.
@@ -220,30 +223,32 @@ export class UserResolver {
             field: "newPassword",
             message: "length must be greater than 2",
           },
-        ]
+        ],
       };
-    };
-   
-    const key = `${ FORGET_PASSWORD_PREFIX }${ token }`;
+    }
+
+    const key = `${FORGET_PASSWORD_PREFIX}${token}`;
     const userId = await redis.get(key);
 
     if (!userId) {
       return {
-        errors: [{ field: "token", message: "token expired" }]
-      }
+        errors: [{ field: "token", message: "token expired" }],
+      };
     }
 
-    const user = await em.findOne(User, { id: parseInt(userId) });
+    const userIdNum = parseInt(userId);
+    const user = await User.findOne(userIdNum);
 
     if (!user) {
       return {
-        errors: [{ field: "token", message: "user no longer exists" }]
-      }
+        errors: [{ field: "token", message: "user no longer exists" }],
+      };
     }
 
-    user.password = await argon2.hash(newPassword);
-    await em.persistAndFlush(user);
-
+    await User.update(
+      { id: userIdNum },
+      { password: await argon2.hash(newPassword) }
+    );
     await redis.del(key);
 
     // Log in user after resetting password.
@@ -257,8 +262,8 @@ export class UserResolver {
    * @returns Promise<User[]>
    */
   @Query(() => [User], { description: "Returns all the users in the db." }) // GraphQL decorator
-  users(@Ctx() { em }: MyContext): Promise<User[]> {
-    return em.find(User, {});
+  users(): Promise<User[]> {
+    return User.find({});
   }
 
   /**
@@ -266,12 +271,7 @@ export class UserResolver {
    * @param id number
    * @returns Promise<User | null>
    */
-  user(
-    @Arg("id", () => Int) // These are just decorators for parameters from type-graphql
-    id: number,
-    @Ctx()
-    { em }: MyContext
-  ): Promise<User | null> {
-    return em.findOne(User, { id });
+  user(@Arg("id", () => Int) id: number): Promise<User | undefined> {
+    return User.findOne(id);
   }
 }

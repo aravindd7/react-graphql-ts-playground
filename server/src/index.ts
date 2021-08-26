@@ -13,16 +13,16 @@ import { buildSchema } from "type-graphql";
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core/dist/plugin/landingPage/graphqlPlayground";
 
 // Redis & sessions
-// import redis from "redis";
 import Redis from "ioredis";
 import session from "express-session";
 import connectRedis from "connect-redis";
+import path from "path";
 
 // Resolvers
 import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
-import { Post } from "@entities/Post";
-import { User } from "@entities/User";
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
 // import { sendEmail } from "./utils/sendEmail";
 
 const main = async () => {
@@ -35,15 +35,25 @@ const main = async () => {
   //   undefined,
   //   "<h1>Welcome to the WORLD OF TOMORROW!</h1>"
   // );
+
   const conn = await createConnection({
-    type: 'postgres',
-    database: 'lireddit',
+    type: "postgres",
+    database: "lireddit",
     username: env.DB_USER,
     password: env.DB_PASS,
+    host: env.DB_HOST,
+    port: env.DB_PORT,
     logging: true,
     synchronize: true,
-    entities: [Post, User]
-  })
+    migrations: [path.join(__dirname, "./migrations/*")],
+    entities: [Post, User],
+  });
+  
+  await conn.runMigrations();
+
+  // Just added this to make the compiler shut up for a bit while
+  // I figure out what I want to do with the connection.
+  console.log("db: ", conn.options.database);
 
   const app = express();
 

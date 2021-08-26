@@ -11,7 +11,7 @@ export const NavBar: React.FC<NavBarProps> = ({}) => {
   const [{ fetching: logoutFetching }, logout] = useLogoutMutation();
   const [{ data, fetching }] = useMeQuery({
     // Pause the query if it will be run on the server. We can tell that the
-    // query will run on the server if the window variable is defined. 
+    // query will run on the server if the window variable is defined.
     // Check utils/isServer.ts for boolean logic.
     pause: isServer(),
   });
@@ -38,25 +38,39 @@ export const NavBar: React.FC<NavBarProps> = ({}) => {
   } else {
     body = (
       <Flex>
+        <Box mr={2}>
+          <NextLink href="/create-post">
+            <Button variant="link" color="white">Create post</Button>
+          </NextLink>
+        </Box>
         <Box mr={2} color="white">
           {data.me.username}
         </Box>
-        <Button
-          onClick={() => {
-            logout();
-          }}
-          isLoading={logoutFetching}
-          variant="link"
-          color="white"
-        >
-          Logout
-        </Button>
+        <Box>
+          <Button
+            onClick={() => {
+              logout();
+            }}
+            isLoading={logoutFetching}
+            variant="link"
+            color="white"
+          >
+            Logout
+          </Button>
+        </Box>
       </Flex>
     );
   }
 
   return (
-    <Flex bg="green.600" p={4} ml={"auto"}>
+    <Flex
+      position="sticky"
+      top={0}
+      zIndex={10}
+      bg="green.600"
+      p={4}
+      ml={"auto"}
+    >
       <Box ml={"auto"}>{body}</Box>
     </Flex>
   );

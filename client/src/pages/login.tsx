@@ -1,6 +1,6 @@
 import React from "react";
 import { Form, Formik } from "formik";
-import { Box, Button, Flex, } from "@chakra-ui/react";
+import { Box, Button, Flex } from "@chakra-ui/react";
 import NextLink from "next/link";
 import { Wrapper } from "../components/Wrapper";
 import { InputField } from "../components/InputField";
@@ -26,8 +26,11 @@ export const Login: React.FC<LoginProps> = ({}) => {
           if (response.data?.login.errors) {
             setErrors(toErrorMap(response.data.login.errors));
           } else if (response.data?.login.user) {
-            // Register worked; go to another page.
-            router.push("/");
+            if (typeof router.query.next === "string") {
+              router.push(router.query.next);
+            } else {
+              router.push("/");
+            }
           }
         }}
       >
