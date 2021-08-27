@@ -83,6 +83,7 @@ export type Post = {
   points: Scalars['Float'];
   createdAt: Scalars['String'];
   updatedAt: Scalars['String'];
+  textSnippet: Scalars['String'];
 };
 
 export type PostInput = {
@@ -192,7 +193,7 @@ export type PostsQueryVariables = Exact<{
 }>;
 
 
-export type PostsQuery = { __typename?: 'Query', posts: Array<{ __typename?: 'Post', id: number, createdAt: string, updatedAt: string, title: string }> };
+export type PostsQuery = { __typename?: 'Query', posts: Array<{ __typename?: 'Post', id: number, title: string, textSnippet: string, createdAt: string, updatedAt: string }> };
 
 export const BasicErrorInfoFragmentDoc = gql`
     fragment BasicErrorInfo on FieldError {
@@ -296,9 +297,10 @@ export const PostsDocument = gql`
     query Posts($limit: Int!, $cursor: String) {
   posts(limit: $limit, cursor: $cursor) {
     id
+    title
+    textSnippet
     createdAt
     updatedAt
-    title
   }
 }
     `;

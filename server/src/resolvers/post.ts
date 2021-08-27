@@ -8,6 +8,8 @@ import {
   Ctx,
   UseMiddleware,
   Int,
+  FieldResolver,
+  Root,
 } from "type-graphql";
 
 import { MyContext } from "../types";
@@ -21,8 +23,16 @@ class PostInput {
   @Field() text: string;
 }
 
-@Resolver()
+@Resolver(Post)
 export class PostResolver {
+  @FieldResolver(() => String)
+  textSnippet(
+    @Root() root: Post
+  ) {
+    return root.text.slice(0, 255);
+  }
+
+
   // Returns all posts in the db.
   @Query(() => [Post], {
     description: "Returns posts from the db with a limit and cursor.",
@@ -31,6 +41,7 @@ export class PostResolver {
     @Arg("limit", () => Int) limit: number,
     @Arg("cursor", () => String, { nullable: true }) cursor: string | null
   ): Promise<Post[]> {
+    console.log("resolver called");
     const realLimit = Math.min(50, limit);
     const qb = getConnection()
       .getRepository(Post)

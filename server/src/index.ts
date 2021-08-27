@@ -49,7 +49,7 @@ const main = async () => {
     entities: [Post, User],
   });
   
-  await conn.runMigrations();
+  // await conn.runMigrations();
 
   // Just added this to make the compiler shut up for a bit while
   // I figure out what I want to do with the connection.
