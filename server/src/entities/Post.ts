@@ -4,11 +4,13 @@ import {
   CreateDateColumn,
   Entity,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { Field, Int, ObjectType } from "type-graphql";
 import { User } from "./User";
+import { Upvotes } from "./Upvotes";
 
 @ObjectType({ description: "A public post that will be rendered in the app." })
 @Entity()
@@ -21,6 +23,7 @@ export class Post extends BaseEntity {
   @Column()
   creatorId: number;
   
+  @Field()
   @ManyToOne(() => User, user => user.posts)
   creator: User;
 
@@ -32,6 +35,9 @@ export class Post extends BaseEntity {
   @Column({ type: "text" })
   text!: string;
   
+  @OneToMany(() => Upvotes, (upvotes) => upvotes.post)
+  upvotes: Upvotes[];
+
   @Field()
   @Column({ type: "int", default: 0 })
   points!: number;

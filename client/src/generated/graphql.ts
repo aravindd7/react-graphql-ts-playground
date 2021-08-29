@@ -73,6 +73,12 @@ export type MutationChangePasswordArgs = {
   token: Scalars['String'];
 };
 
+export type PaginatedPosts = {
+  __typename?: 'PaginatedPosts';
+  posts: Array<Post>;
+  hasMorePosts: Scalars['Boolean'];
+};
+
 /** A public post that will be rendered in the app. */
 export type Post = {
   __typename?: 'Post';
@@ -94,7 +100,7 @@ export type PostInput = {
 export type Query = {
   __typename?: 'Query';
   /** Returns posts from the db with a limit and cursor. */
-  posts: Array<Post>;
+  posts: PaginatedPosts;
   /** Returns a single post in the db based on id. */
   post?: Maybe<Post>;
   me?: Maybe<User>;
@@ -193,7 +199,7 @@ export type PostsQueryVariables = Exact<{
 }>;
 
 
-export type PostsQuery = { __typename?: 'Query', posts: Array<{ __typename?: 'Post', id: number, title: string, textSnippet: string, createdAt: string, updatedAt: string }> };
+export type PostsQuery = { __typename?: 'Query', posts: { __typename?: 'PaginatedPosts', hasMorePosts: boolean, posts: Array<{ __typename?: 'Post', id: number, title: string, textSnippet: string, createdAt: string, updatedAt: string }> } };
 
 export const BasicErrorInfoFragmentDoc = gql`
     fragment BasicErrorInfo on FieldError {
@@ -296,11 +302,14 @@ export function useMeQuery(options: Omit<Urql.UseQueryArgs<MeQueryVariables>, 'q
 export const PostsDocument = gql`
     query Posts($limit: Int!, $cursor: String) {
   posts(limit: $limit, cursor: $cursor) {
-    id
-    title
-    textSnippet
-    createdAt
-    updatedAt
+    hasMorePosts
+    posts {
+      id
+      title
+      textSnippet
+      createdAt
+      updatedAt
+    }
   }
 }
     `;

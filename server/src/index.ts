@@ -23,6 +23,7 @@ import { PostResolver } from "./resolvers/post";
 import { UserResolver } from "./resolvers/user";
 import { Post } from "./entities/Post";
 import { User } from "./entities/User";
+import { Upvotes } from "./entities/Upvotes";
 // import { sendEmail } from "./utils/sendEmail";
 
 const main = async () => {
@@ -35,6 +36,9 @@ const main = async () => {
   //   undefined,
   //   "<h1>Welcome to the WORLD OF TOMORROW!</h1>"
   // );
+  
+  console.log("Attempting to connect to PostgresQL db...");
+  console.log(`Connection: ${ env.DB_HOST }:${ env.DB_PORT }`);
 
   const conn = await createConnection({
     type: "postgres",
@@ -46,7 +50,7 @@ const main = async () => {
     logging: true,
     synchronize: true,
     migrations: [path.join(__dirname, "./migrations/*")],
-    entities: [Post, User],
+    entities: [Post, User, Upvotes],
   });
   
   // await conn.runMigrations();

@@ -2,11 +2,13 @@ import {
   Arg,
   Ctx,
   Field,
+  FieldResolver,
   Int,
   Mutation,
   ObjectType,
   Query,
   Resolver,
+  Root,
 } from "type-graphql";
 import { getConnection } from "typeorm";
 import argon2 from "argon2";
@@ -38,8 +40,17 @@ class UserResponse {
   user?: User;
 }
 
-@Resolver() // From GraphQL (type-graphql package)
+@Resolver(User) // From GraphQL (type-graphql package)
 export class UserResolver {
+  @FieldResolver(() => String)
+  email(@Root() user: User, @Ctx() { req }: MyContext) {
+    // This is the current user and its okay to show them their own email.
+    if (req.session.userId === user.id) {
+      return user.email;
+    }
+    // The current user isn't this user, so don't show them the email.
+    return ""; 
+  }
   /**
    * Returns the current user (logged in)
    * @returns Promise<User | undefined>
