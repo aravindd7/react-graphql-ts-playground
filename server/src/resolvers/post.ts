@@ -39,33 +39,30 @@ export class PostResolver {
   }
 
   /**
-   * Sets a vote on a post. 
-   * @param postId number, the post id where the vote will be set. 
-   * @returns Promise<Boolean> 
+   * Sets a vote on a post.
+   * @param postId number, the post id where the vote will be set.
+   * @returns Promise<Boolean>
    */
   @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
   async vote(
-    @Arg('postId', () => Int) postId: number,
-    @Arg('value', () => Int) value: number,
+    @Arg("postId", () => Int) postId: number,
+    @Arg("value", () => Int) value: number,
     @Ctx() { req }: MyContext
   ): Promise<Boolean> {
     const isUpvote = value !== -1;
     const realValue = isUpvote ? 1 : -1;
     const { userId } = req.session;
-    
-    await Upvotes.insert({
-      userId,
-      postId,
-      value: realValue,
-    });
 
-    await Post.update
     await await getConnection().query(`
-      UPDATE post p
-      SET p.points = p.points + $1
-      WHERE p.id = $2
-    `, [realValue, postId])
+      START TRANSACTION;
+      INSERT INTO upvotes("userId", "postId", value)
+      values(${ userId }, ${ postId }, ${ realValue });
+      UPDATE post
+      SET points = points + ${ value }
+      WHERE id = ${ postId };
+      COMMIT;
+    `);
 
     return true;
   }
@@ -87,7 +84,8 @@ export class PostResolver {
       replacements.push(new Date(parseInt(cursor)));
     }
 
-    const posts = await getConnection().query(`
+    const posts = await getConnection().query(
+      `
       SELECT p.*, 
       json_build_object(
         'id', u.id,
@@ -99,22 +97,11 @@ export class PostResolver {
       ${cursor ? `WHERE p."createdAt" < $2` : ""}
       ORDER by p."createdAt" DESC
       LIMIT $1
-    `, replacements);
-
-    // const qb = getConnection()
-    //   .getRepository(Post)
-    //   .createQueryBuilder("p")
-    //   .innerJoinAndSelect(
-    //     "p.creator",
-    //     "user",
-    //     "user.id = :p.creatorId"
-    //   )
-    //   .orderBy('p."createdAt"', "DESC")
-    //   .take(realLimitPlusOne);
-
-    // const posts = await qb.getMany();
-
-    console.log("posts: ", posts);
+    `,
+      replacements
+    );
+    
+    console.log(posts);
 
     return {
       posts: posts.slice(0, realLimit),

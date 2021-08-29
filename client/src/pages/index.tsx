@@ -1,4 +1,14 @@
-import { Box, Button, Flex, Heading, Stack, Text } from "@chakra-ui/react";
+import { ChevronDownIcon, ChevronUpIcon } from "@chakra-ui/icons";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Icon,
+  IconButton,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import { withUrqlClient } from "next-urql";
 import React, { useState } from "react";
 import { Layout } from "../components/Layout";
@@ -17,7 +27,7 @@ const Index: React.FC<{}> = () => {
       <Layout>
         <div>no posts to find.</div>;
       </Layout>
-    )
+    );
   }
 
   return (
@@ -27,10 +37,40 @@ const Index: React.FC<{}> = () => {
       ) : (
         <Stack spacing={8}>
           {data!.posts.posts.map((p) => (
-            <Box key={p.id} p={5} shadow="md" borderWidth="1px">
-              <Heading fontSize="xl">{p.title}</Heading>
-              <Text mt={4}>{p.textSnippet}</Text>
-            </Box>
+            <Flex key={p.id} p={5} shadow="md" borderWidth="1px">
+              <Flex
+                flex="0 1 30px"
+                flexDirection="column"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <IconButton 
+                  icon={<ChevronUpIcon w="1.5em" h="auto" />}
+                  aria-label="upvote"
+                  variant="link"
+                />
+                {p.points}
+                <IconButton
+                  icon={<ChevronDownIcon w="1.5em" h="auto" />}
+                  aria-label="downvote"
+                  variant="link"
+                />
+              </Flex>
+              <Flex flexDirection="column" ml="4" flex="1 0 auto">
+                <Flex
+                  flex="1 0 auto"
+                  justifyContent="space-between"
+                  align-items="center"
+                  width="100%"
+                >
+                  <Heading fontSize="xl">{p.title}</Heading> Posted by{" "}
+                  {p.creator.username}
+                </Flex>
+                <Text mt={4} width="100%">
+                  {p.textSnippet}
+                </Text>
+              </Flex>
+            </Flex>
           ))}
         </Stack>
       )}

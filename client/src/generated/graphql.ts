@@ -22,6 +22,7 @@ export type FieldError = {
 
 export type Mutation = {
   __typename?: 'Mutation';
+  vote: Scalars['Boolean'];
   /** Creates a post in the db. */
   createPost: Post;
   /** Updates a post in the db. */
@@ -33,6 +34,12 @@ export type Mutation = {
   logout: Scalars['Boolean'];
   forgotPassword: Scalars['Boolean'];
   changePassword: UserResponse;
+};
+
+
+export type MutationVoteArgs = {
+  value: Scalars['Int'];
+  postId: Scalars['Int'];
 };
 
 
@@ -84,6 +91,7 @@ export type Post = {
   __typename?: 'Post';
   id: Scalars['Int'];
   creatorId: Scalars['Float'];
+  creator: User;
   title: Scalars['String'];
   text: Scalars['String'];
   points: Scalars['Float'];
@@ -199,7 +207,7 @@ export type PostsQueryVariables = Exact<{
 }>;
 
 
-export type PostsQuery = { __typename?: 'Query', posts: { __typename?: 'PaginatedPosts', hasMorePosts: boolean, posts: Array<{ __typename?: 'Post', id: number, title: string, textSnippet: string, createdAt: string, updatedAt: string }> } };
+export type PostsQuery = { __typename?: 'Query', posts: { __typename?: 'PaginatedPosts', hasMorePosts: boolean, posts: Array<{ __typename?: 'Post', id: number, title: string, textSnippet: string, points: number, createdAt: string, updatedAt: string, creator: { __typename?: 'User', id: number, username: string } }> } };
 
 export const BasicErrorInfoFragmentDoc = gql`
     fragment BasicErrorInfo on FieldError {
@@ -307,8 +315,13 @@ export const PostsDocument = gql`
       id
       title
       textSnippet
+      points
       createdAt
       updatedAt
+      creator {
+        id
+        username
+      }
     }
   }
 }
