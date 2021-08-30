@@ -12,6 +12,7 @@ import {
 import { withUrqlClient } from "next-urql";
 import React, { useState } from "react";
 import { Layout } from "../components/Layout";
+import UpvoteComponent from "../components/UpvoteComponent";
 import { usePostsQuery } from "../generated/graphql";
 import { createUrqlClient } from "../utils/createUrqlClient";
 
@@ -38,25 +39,8 @@ const Index: React.FC<{}> = () => {
         <Stack spacing={8}>
           {data!.posts.posts.map((p) => (
             <Flex key={p.id} p={5} shadow="md" borderWidth="1px">
-              <Flex
-                flex="0 1 30px"
-                flexDirection="column"
-                justifyContent="center"
-                alignItems="center"
-              >
-                <IconButton 
-                  icon={<ChevronUpIcon w="1.5em" h="auto" />}
-                  aria-label="upvote"
-                  variant="link"
-                />
-                {p.points}
-                <IconButton
-                  icon={<ChevronDownIcon w="1.5em" h="auto" />}
-                  aria-label="downvote"
-                  variant="link"
-                />
-              </Flex>
-              <Flex flexDirection="column" ml="4" flex="1 0 auto">
+              <UpvoteComponent points={p.points} postId={p.id} />
+              <Flex flexDirection="column" flex="1 1 auto">
                 <Flex
                   flex="1 0 auto"
                   justifyContent="space-between"

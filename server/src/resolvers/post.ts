@@ -54,16 +54,87 @@ export class PostResolver {
     const realValue = isUpvote ? 1 : -1;
     const { userId } = req.session;
 
-    await await getConnection().query(`
-      START TRANSACTION;
-      INSERT INTO upvotes("userId", "postId", value)
-      values(${ userId }, ${ postId }, ${ realValue });
-      UPDATE post
-      SET points = points + ${ value }
-      WHERE id = ${ postId };
-      COMMIT;
-    `);
+    const upvote = await Upvotes.findOne({ where: { postId, userId } });
 
+    if (upvote == undefined) {
+      // CONDITION
+      // The user hasn't already voted on the post.
+      const insertIntoUpvotes = await getConnection()
+        .createQueryBuilder()
+        .insert()
+        .into(Upvotes)
+        .values({
+          postId,
+          userId,
+          value,
+        })
+        .execute();
+
+      if (insertIntoUpvotes) {
+        // Update Post(postId) with new point value.
+        await getConnection()
+          .createQueryBuilder()
+          .update(Post)
+          .set({
+            points: () => `points + ${realValue}`,
+          })
+          .where("id = :id", { id: postId })
+          .execute();
+      }
+    } else if (upvote && upvote.value === realValue) {
+      // CONDITION
+      // The user is trying to negate their vote on a post e.g. they clicked
+      // upvote twice.
+      console.log("realValue: ", realValue);
+      console.log("upvote.value: ", upvote!.value);
+      const deleteUpvote = await getConnection()
+        .createQueryBuilder()
+        .delete()
+        .from(Upvotes)
+        .where("userId = :userId", { userId })
+        .andWhere("postId = :postId", { postId })
+        .execute();
+
+      if (deleteUpvote) {
+        await getConnection()
+          .createQueryBuilder()
+          .update(Post)
+          .set({
+            points: () => `points - ${ realValue }`,
+          })
+          .where("id = :id", { id: postId })
+          .execute();
+      }
+
+    } else if (upvote && upvote.value !== realValue) {
+      // CONDITION
+      // The user is trying to negate their previous vote and vote in the
+      // other direction e.g. changing an upvote to a downvote.
+      console.log("realValue: ", realValue);
+      console.log("upvote.value: ", upvote!.value);
+      const updateUpvote = await getConnection()
+        .createQueryBuilder()
+        .update(Upvotes)
+        .set({
+          value: () => `value * -1`,
+        })
+        .where("userId = :userId", { userId })
+        .andWhere("postId = :postId", { postId })
+        .execute();
+
+      console.log("UPDATEUPVOTE: ", updateUpvote);
+
+      if (updateUpvote) {
+        await getConnection()
+          .createQueryBuilder()
+          .update(Post)
+          .set({
+            points: () => `points + ${ 2 * realValue }`,
+          })
+          .where("id = :id", { id: postId })
+          .execute();
+      }
+    }
     return true;
   }
 
@@ -100,8 +171,6 @@ export class PostResolver {
     `,
       replacements
     );
-    
-    console.log(posts);
 
     return {
       posts: posts.slice(0, realLimit),

@@ -1,0 +1,12 @@
+fragment BasicPostInfo on Post {
+  id
+  title
+  points
+  textSnippet
+  creator {
+    id
+    username
+  }
+  createdAt
+  updatedAt
+}
